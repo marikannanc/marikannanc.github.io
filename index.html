@@ -837,9 +837,6 @@ const PROFILE = {
   trailhead: "https://www.salesforce.com/trailblazer/marikannanc",
   resume:    "https://example.com/marikannan-c-resume.pdf",
 
-  // EmailJS keys for the styled contact email (see setup steps).
-  emailjs: { serviceId: "YOUR_SERVICE_ID", templateId: "YOUR_TEMPLATE_ID", publicKey: "YOUR_PUBLIC_KEY" },
-
   // Statistics shown in About. Edit values to match your resume.
   stats: [
     { value: "1+",       label: "Year of Salesforce experience" },
@@ -1062,7 +1059,7 @@ function drawNet(){
 addEventListener("load", drawNet); addEventListener("resize", drawNet);
 if (document.fonts) document.fonts.ready.then(drawNet);
 
-/* contact form: sends a styled email to you through EmailJS (emailjs.com) */
+/* contact form: sends the message straight to PROFILE.email via FormSubmit (formsubmit.co) */
 document.getElementById("contactForm").addEventListener("submit", async e => {
   e.preventDefault();
   const f = e.target, st = document.getElementById("formStatus"), btn = f.querySelector('button[type="submit"]');
@@ -1072,26 +1069,24 @@ document.getElementById("contactForm").addEventListener("submit", async e => {
   }
   btn.disabled = true; btn.textContent = "Sending…"; st.className = "form-status"; st.textContent = "";
   try {
-    const k = PROFILE.emailjs;
-    if (/^YOUR_/.test(k.serviceId + k.templateId + k.publicKey) || [k.serviceId, k.templateId, k.publicKey].some(v => !v || /^YOUR_/.test(v))) {
-      throw new Error("EmailJS isn't set up yet. Add your Service ID, Template ID and Public Key in the PROFILE section of index.html");
-    }
-    const res = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+    const res = await fetch("https://formsubmit.co/ajax/" + PROFILE.email, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
       body: JSON.stringify({
-        service_id: k.serviceId, template_id: k.templateId, user_id: k.publicKey,
-        template_params: { from_name: d.name, from_email: d.email, subject: d.subject, message: d.message }
+        message: `Name: ${d.name}\nEmail: ${d.email}\nSubject: ${d.subject}\n\nMessage:\n${d.message}`,
+        _subject: d.subject, _replyto: d.email, _template: "basic", _captcha: "false"
       })
     });
-    if (!res.ok) throw new Error((await res.text().catch(() => "")) || "Send failed");
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok || String(out.success) === "false") throw new Error(out.message || "Send failed");
     f.reset();
     st.textContent = "Message sent. Thanks, I'll get back to you soon.";
     showToast("Message sent");
   } catch (err) {
     st.className = "form-status err";
     const why = String(err && err.message || "");
-    if (location.protocol === "file:" || /claude\.ai|claudeusercontent/.test(location.hostname)) st.textContent = "Message not sent. This form only works on the live website, not in a preview or a file opened from your computer.";
+    if (/activat/i.test(why)) st.textContent = "Almost there: check " + PROFILE.email + " for the FormSubmit activation email and click Activate. Then send again.";
+    else     if (location.protocol === "file:" || /claude\.ai|claudeusercontent/.test(location.hostname)) st.textContent = "Message not sent. This form only works on the live website, not in a preview or a file opened from your computer.";
     else st.textContent = "Message not sent" + (why && why !== "Failed to fetch" ? ": " + why : ". Check your connection and try again.");
   } finally {
     btn.disabled = false; btn.textContent = "Send Message";
